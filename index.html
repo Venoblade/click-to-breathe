@@ -73,8 +73,8 @@
   const d = {
     di:{n:'Diaphragm Strength',b:5,desc:'+2 oxygen per click'},
     lu:{n:'Lung Capacity',b:25,desc:'+20 max oxygen'},
-    fi:{n:'Carbon Filter',b:50,desc:'Slower oxygen drain'},
-    au:{n:'Auto-breather',b:20,desc:'Breathes automatically'}
+    fi:{b:50,n:'Carbon Filter',desc:'Slower oxygen drain'},
+    au:{b:20,n:'Auto-breather',desc:'Breathes automatically'}
   };
   const cost = e => Math.floor(d[e].b*Math.pow(1.25,s.up[e]));
 
@@ -134,24 +134,21 @@
     s.ap += 2 + s.up.di;
 
     update();
-    fetchLeaderboard();
+    fetchLeaderboard(); // immediate leaderboard update
   }
 
   // --- TICK FUNCTION ---
   function tick(){
-    // Oxygen drain over 10 seconds
     s.oxygen -= 10/(1 + 0.2*s.up.fi);
     if(s.oxygen <=0){s.oxygen=10;s.ap=Math.max(0,s.ap-5);}
 
-    // Low oxygen sound
     if(s.oxygen < 25){
       lowOxygenSound.volume = 0.3;
       if(lowOxygenSound.paused) lowOxygenSound.play().catch(()=>{});
     } else { lowOxygenSound.pause(); lowOxygenSound.currentTime=0; }
 
-    // Auto-breather: 10 autos = 1 normal breathe
     if(s.auto>0){
-        const autoScale = 0.1; // 10 autos = 1 manual breathe
+        const autoScale = 0.1;
         const baseGain = s.maxOxygen * 0.25;
         const upgradeGain = 2 * s.up.di;
         s.oxygen = Math.min(s.maxOxygen, s.oxygen + s.auto * autoScale * (baseGain + upgradeGain));
@@ -160,6 +157,7 @@
     }
 
     update();
+    fetchLeaderboard(); // live update for auto-breathers
   }
 
   // --- MUTE & VOLUME ---
@@ -256,7 +254,6 @@
       leaderboardDiv.style.display = "block";
 
       setInterval(tick,1000);
-      setInterval(fetchLeaderboard,1000);
 
       document.body.addEventListener("click", () => {
         if(ambientSound.paused) ambientSound.play().catch(()=>{});
