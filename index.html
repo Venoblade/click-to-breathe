@@ -32,6 +32,7 @@
     <h1>Click to Breathe</h1>
     <p>Click or press SPACE to breathe and stay alive.</p>
     <button id="breathBtn">💨 Breathe</button>
+    <button id="saveScoreBtn">💾 Save Score</button>
 
     <div>
       Oxygen: <span id="oxygen">100</span>%
@@ -134,10 +135,9 @@
     s.ap += 2 + s.up.di;
 
     update();
-    fetchLeaderboard(); // immediate leaderboard update
+    fetchLeaderboard();
   }
 
-  // --- TICK FUNCTION ---
   function tick(){
     s.oxygen -= 10/(1 + 0.2*s.up.fi);
     if(s.oxygen <=0){s.oxygen=10;s.ap=Math.max(0,s.ap-5);}
@@ -157,7 +157,7 @@
     }
 
     update();
-    fetchLeaderboard(); // live update for auto-breathers
+    fetchLeaderboard();
   }
 
   // --- MUTE & VOLUME ---
@@ -214,9 +214,15 @@
     }).catch(err=>console.error(err));
   }
 
-  function breatheAndUpdate(){
-    breathe();
-  }
+  const saveScoreBtn = document.getElementById('saveScoreBtn');
+  saveScoreBtn.onclick = () => {
+    saveScoreBtn.disabled = true;
+    submitScore();
+    fetchLeaderboard();
+    setTimeout(()=>{ saveScoreBtn.disabled = false; }, 2000);
+  };
+
+  function breatheAndUpdate(){ breathe(); }
 
   // --- PROFANITY FILTER ---
   let profanityList = new Set();
@@ -254,6 +260,12 @@
       leaderboardDiv.style.display = "block";
 
       setInterval(tick,1000);
+
+      // Live leaderboard auto-submit every 3s
+      setInterval(()=>{
+        submitScore();
+        fetchLeaderboard();
+      },3000);
 
       document.body.addEventListener("click", () => {
         if(ambientSound.paused) ambientSound.play().catch(()=>{});
