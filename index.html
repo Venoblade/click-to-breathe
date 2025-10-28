@@ -220,6 +220,23 @@
     breathe();
   }
 
+  // --- PROFANITY FILTER ---
+  let profanityList = new Set();
+  async function loadProfanityList(){
+    const res = await fetch('https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en');
+    const text = await res.text();
+    text.split('\n').forEach(word => profanityList.add(word.trim().toLowerCase()));
+  }
+
+  function filterUsername(name){
+    let clean = name.trim();
+    profanityList.forEach(word => {
+      const regex = new RegExp(word, "gi");
+      clean = clean.replace(regex, "***");
+    });
+    return clean;
+  }
+
   // --- START GAME ---
   const startBtn = document.getElementById('startBtn');
   const usernameInput = document.getElementById('usernameInput');
@@ -227,29 +244,32 @@
   const leaderboardDiv = document.querySelector('.leaderboard');
   const usernamePrompt = document.getElementById('usernamePrompt');
 
-  startBtn.onclick = () => {
-    const name = usernameInput.value.trim();
-    if(!name){ alert("Please enter a username"); return; }
-    playerName = name;
+  loadProfanityList().then(() => {
+    startBtn.onclick = () => {
+      let name = usernameInput.value.trim();
+      if(!name){ alert("Please enter a username"); return; }
 
-    usernamePrompt.style.display = "none";
-    gameDiv.style.display = "block";
-    leaderboardDiv.style.display = "block";
+      playerName = filterUsername(name);
 
-    setInterval(tick,1000);
-    setInterval(fetchLeaderboard,1000);
+      usernamePrompt.style.display = "none";
+      gameDiv.style.display = "block";
+      leaderboardDiv.style.display = "block";
 
-    document.body.addEventListener("click", () => {
-      if(ambientSound.paused) ambientSound.play().catch(()=>{});
-    }, {once:true});
+      setInterval(tick,1000);
+      setInterval(fetchLeaderboard,1000);
 
-    window.addEventListener("beforeunload", submitScore);
+      document.body.addEventListener("click", () => {
+        if(ambientSound.paused) ambientSound.play().catch(()=>{});
+      }, {once:true});
 
-    document.getElementById('breathBtn').onclick = breatheAndUpdate;
-    window.onkeydown = e => { if(e.code==='Space') breatheAndUpdate(); };
+      window.addEventListener("beforeunload", submitScore);
 
-    update();
-  };
+      document.getElementById('breathBtn').onclick = breatheAndUpdate;
+      window.onkeydown = e => { if(e.code==='Space') breatheAndUpdate(); };
+
+      update();
+    };
+  });
 </script>
 </body>
 </html>
