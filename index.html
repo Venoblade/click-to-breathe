@@ -137,14 +137,28 @@
     fetchLeaderboard();
   }
 
+  // --- TICK FUNCTION ---
   function tick(){
-    s.oxygen -= 10/(1 + .2*s.up.fi);
+    // Oxygen drain over 10 seconds
+    s.oxygen -= 10/(1 + 0.2*s.up.fi);
     if(s.oxygen <=0){s.oxygen=10;s.ap=Math.max(0,s.ap-5);}
+
+    // Low oxygen sound
     if(s.oxygen < 25){
       lowOxygenSound.volume = 0.3;
       if(lowOxygenSound.paused) lowOxygenSound.play().catch(()=>{});
     } else { lowOxygenSound.pause(); lowOxygenSound.currentTime=0; }
-    if(s.auto>0){ s.ap+=.5*s.auto; s.oxygen=Math.min(s.maxOxygen,s.oxygen+.3*s.auto); }
+
+    // Auto-breather: 10 autos = 1 normal breathe
+    if(s.auto>0){
+        const autoScale = 0.1; // 10 autos = 1 manual breathe
+        const baseGain = s.maxOxygen * 0.25;
+        const upgradeGain = 2 * s.up.di;
+        s.oxygen = Math.min(s.maxOxygen, s.oxygen + s.auto * autoScale * (baseGain + upgradeGain));
+        s.ap += s.auto * autoScale * (2 + s.up.di);
+        s.breaths += s.auto * autoScale;
+    }
+
     update();
   }
 
@@ -237,6 +251,5 @@
     update();
   };
 </script>
-
 </body>
 </html>
