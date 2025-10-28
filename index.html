@@ -56,7 +56,8 @@
     if (ambientSound.paused) ambientSound.play().catch(()=>{});
   }, {once: true});
 
-  const s = {oxygen:100,maxOxygen:100,ap:0,breaths:0,auto:0,up:{di:0,lu:0,fi:0,au:0},last:0,cool:300};
+  // --- GAME STATE ---
+  const s = {oxygen:100,maxOxygen:100,ap:0,breaths:0,auto:0,up:{di:0,lu:0,fi:0,au:0},last:0,cool:3000}; // 3 sec cooldown
   const d = {
     di:{n:'Diaphragm Strength',b:5,desc:'+2 oxygen per click'},
     lu:{n:'Lung Capacity',b:25,desc:'+20 max oxygen'},
@@ -111,7 +112,7 @@
   }
 
   function tick(){
-    s.oxygen -= .5/(1 + .2*s.up.fi);
+    s.oxygen -= 10/(1 + .2*s.up.fi); // drains from 100 → 0 in ~10 sec
     if(s.oxygen <=0){s.oxygen=10;s.ap=Math.max(0,s.ap-5);}
     if(s.oxygen < 25){
       lowOxygenSound.volume = 0.3;
