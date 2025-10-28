@@ -6,7 +6,7 @@
 <style>
   body {font-family:sans-serif;background:#0a0e18;color:#fff;margin:0;padding:0;}
   .container {display:flex;gap:30px;align-items:flex-start;padding:20px;}
-  .game {flex:2;text-align:center;display:none;} /* hidden until username entered */
+  .game {flex:2;text-align:center;display:none;}
   .leaderboard {flex:1;background:#111;padding:15px;border-radius:10px;display:none;}
   button {padding:10px 20px;font-size:18px;margin:10px;border:none;border-radius:8px;background:#6ee7b7;color:#051810;cursor:pointer;transition:.2s;}
   button:disabled {opacity:.5;cursor:not-allowed;}
@@ -69,7 +69,7 @@
   const lowOxygenSound = new Audio("lowoxygen.mp3");
 
   // --- GAME STATE ---
-  const s = {oxygen:100,maxOxygen:100,ap:0,breaths:0,auto:0,up:{di:0,lu:0,fi:0,au:0},last:0,cool:3000}; // 3 sec cooldown
+  const s = {oxygen:100,maxOxygen:100,ap:0,breaths:0,auto:0,up:{di:0,lu:0,fi:0,au:0},last:0,cool:3000};
   const d = {
     di:{n:'Diaphragm Strength',b:5,desc:'+2 oxygen per click'},
     lu:{n:'Lung Capacity',b:25,desc:'+20 max oxygen'},
@@ -86,6 +86,8 @@
         apF=document.getElementById('apFill'),
         upg=document.getElementById('upgrades'),
         leaderboardList = document.getElementById('leaderboardList');
+
+  let playerName = "";
 
   function update(){
     ox.textContent = s.oxygen|0;
@@ -115,6 +117,7 @@
     }
   }
 
+  // --- BREATH FUNCTION ---
   function breathe(){
     const now = Date.now();
     if(now - s.last < s.cool) return;
@@ -123,15 +126,19 @@
     breathSound.currentTime = 0;
     breathSound.play().catch(()=>{});
 
-    const gain = 2 + 2*s.up.di;
-    s.oxygen = Math.min(s.maxOxygen,s.oxygen+gain);
+    const baseGain = s.maxOxygen * 0.25;
+    const upgradeGain = 2 * s.up.di;
+    s.oxygen = Math.min(s.maxOxygen, s.oxygen + baseGain + upgradeGain);
+
     s.breaths++;
     s.ap += 2 + s.up.di;
+
     update();
+    fetchLeaderboard();
   }
 
   function tick(){
-    s.oxygen -= 10/(1 + .2*s.up.fi); // drains over 10 sec
+    s.oxygen -= 10/(1 + .2*s.up.fi);
     if(s.oxygen <=0){s.oxygen=10;s.ap=Math.max(0,s.ap-5);}
     if(s.oxygen < 25){
       lowOxygenSound.volume = 0.3;
@@ -154,31 +161,52 @@
     [ambientSound, breathSound, lowOxygenSound].forEach(a=>a.volume=volSlider.value);
   };
 
-  // --- LEADERBOARD (Google Sheets) ---
+  // --- LEADERBOARD ---
   const SHEET_URL = "https://script.google.com/macros/s/AKfycbwWPyZRvtoC4oFWcNThJJqtsc2Q4br91NMEZXvXFN8ncF05xVSX0w5atzWet0sx7jTeGQ/exec";
-  let playerName = "";
 
   async function fetchLeaderboard(){
-    try{
+    try {
       const res = await fetch(SHEET_URL);
       const data = await res.json();
       leaderboardList.innerHTML = '';
-      data.slice(0,5).forEach(entry=>{
+
+      data.sort((a,b)=>b[1]-a[1]);
+      const top5 = data.slice(0,5);
+
+      top5.forEach(entry=>{
         const li = document.createElement('li');
         li.textContent = `${entry[0]}: ${entry[1]} breaths`;
+        if(entry[0]===playerName) li.style.color="#6ee7b7";
         leaderboardList.appendChild(li);
       });
-    }catch(err){console.error(err);}
+
+      const inTop5 = top5.some(e=>e[0]===playerName);
+      if(!inTop5){
+        const current = data.find(e=>e[0]===playerName);
+        if(current){
+          leaderboardList.appendChild(document.createElement('hr'));
+          const li = document.createElement('li');
+          li.textContent = `${current[0]}: ${current[1]} breaths`;
+          li.style.color="#6ee7b7";
+          leaderboardList.appendChild(li);
+        }
+      }
+
+    } catch(err){ console.error(err); }
   }
 
   function submitScore(){
-    fetch(SHEET_URL, {
+    fetch(SHEET_URL,{
       method:"POST",
       body: JSON.stringify({name:playerName, breaths:s.breaths})
     }).catch(err=>console.error(err));
   }
 
-  // --- Start Game on Username ---
+  function breatheAndUpdate(){
+    breathe();
+  }
+
+  // --- START GAME ---
   const startBtn = document.getElementById('startBtn');
   const usernameInput = document.getElementById('usernameInput');
   const gameDiv = document.querySelector('.game');
@@ -187,30 +215,27 @@
 
   startBtn.onclick = () => {
     const name = usernameInput.value.trim();
-    if(!name) { alert("Please enter a username"); return; }
+    if(!name){ alert("Please enter a username"); return; }
     playerName = name;
 
-    // Show game and leaderboard
+    usernamePrompt.style.display = "none";
     gameDiv.style.display = "block";
     leaderboardDiv.style.display = "block";
-    usernamePrompt.style.display = "none";
 
-    // Start intervals
     setInterval(tick,1000);
-    setInterval(fetchLeaderboard,5000);
+    setInterval(fetchLeaderboard,1000);
 
-    // Start ambient sound on first click
     document.body.addEventListener("click", () => {
-      if (ambientSound.paused) ambientSound.play().catch(()=>{});
+      if(ambientSound.paused) ambientSound.play().catch(()=>{});
     }, {once:true});
 
-    // Submit score when leaving page
     window.addEventListener("beforeunload", submitScore);
-  };
 
-  // Start game controls
-  document.getElementById('breathBtn').onclick = breathe;
-  window.onkeydown = e => { if(e.code==='Space') breathe(); };
+    document.getElementById('breathBtn').onclick = breatheAndUpdate;
+    window.onkeydown = e => { if(e.code==='Space') breatheAndUpdate(); };
+
+    update();
+  };
 </script>
 
 </body>
