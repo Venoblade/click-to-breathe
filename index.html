@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Click to Breathe</title>
+<style>
+  body {font-family:sans-serif;background:#0a0e18;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}
+  .game {text-align:center;max-width:600px;width:90%;}
+  button {padding:10px 20px;font-size:18px;margin:10px;border:none;border-radius:8px;background:#6ee7b7;color:#051810;cursor:pointer;transition:.2s;}
+  button:disabled {opacity:.5;cursor:not-allowed;}
+  .bar {height:20px;background:#222;border-radius:10px;margin:10px 0;overflow:hidden;}
+  .fill {height:100%;background:#6ee7b7;width:100%;transition:width .2s;}
+  .stats {margin-top:10px;}
+  h1 {font-size:clamp(1.5rem,4vw,2.5rem);}
+  #audioControls {margin-top:15px;}
+</style>
+</head>
+<body>
+
+<div class="game">
+  <h1>Click to Breathe</h1>
+  <p>Click or press SPACE to breathe and stay alive.</p>
+  <button id="breathBtn">💨 Breathe</button>
+
+  <div>
+    Oxygen: <span id="oxygen">100</span>%
+    <div class="bar"><div class="fill" id="oxyFill"></div></div>
+    Air Points (AP): <span id="ap">0</span>
+    <div class="bar"><div class="fill" id="apFill"></div></div>
+  </div>
+
+  <div class="stats">
+    Breaths: <span id="breaths">0</span><br>
+    Auto-breathers: <span id="autos">0</span>
+  </div>
+
+  <h2>Upgrades</h2>
+  <div id="upgrades"></div>
+
+  <div id="audioControls">
+    <button id="muteBtn">🔈 Mute</button>
+    Volume: <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.2">
+  </div>
+</div>
+
+<script>
+  // --- AUDIO ---
+  const breathSound = new Audio("breath.mp3");
+  const ambientSound = new Audio("ambient.mp3");
+  ambientSound.loop = true;
+  ambientSound.volume = 0.2;
+  const lowOxygenSound = new Audio("lowoxygen.mp3");
+
+  // Start ambient after first click
+  document.body.addEventListener("click", () => {
+    if (ambientSound.paused) ambientSound.play().catch(()=>{});
+  }, {once: true});
+
+  const s = {oxygen:100,maxOxygen:100,ap:0,breaths:0,auto:0,up:{di:0,lu:0,fi:0,au:0},last:0,cool:300};
+  const d = {
+    di:{n:'Diaphragm Strength',b:5,desc:'+2 oxygen per click'},
+    lu:{n:'Lung Capacity',b:25,desc:'+20 max oxygen'},
+    fi:{n:'Carbon Filter',b:50,desc:'Slower oxygen drain'},
+    au:{n:'Auto-breather',b:20,desc:'Breathes automatically'}
+  };
+
+  const cost = e => Math.floor(d[e].b*Math.pow(1.25,s.up[e]));
+
+  function update(){
+    ox.textContent = s.oxygen|0;
+    ap.textContent = s.ap|0;
+    br.textContent = s.breaths|0;
+    auT.textContent = s.auto;
+    oxy.style.width = s.oxygen/s.maxOxygen*100+'%';
+    apF.style.width = Math.min(s.ap/10,1)*100+'%';
+    upg.innerHTML = '';
+    for(const e in d){
+      const t=d[e],a=s.up[e],cst=cost(e);
+      const b=document.createElement('button');
+      b.textContent=`${t.n} (${cst} AP)`;
+      b.disabled=s.ap<cst;
+      b.onclick=()=>{
+        if(s.ap>=cst){
+          s.ap-=cst; s.up[e]++;
+          if(e==='lu') s.maxOxygen+=20;
+          if(e==='au') s.auto++;
+          update();
+        }
+      };
+      const div=document.createElement('div');
+      div.textContent=`${t.desc} (Lvl ${a})`;
+      div.appendChild(b);
+      upg.appendChild(div);
+    }
+  }
+
+  function breathe(){
+    const now = Date.now();
+    if(now - s.last < s.cool) return;
+    s.last = now;
+
+    // Play breath sound
+    breathSound.currentTime = 0;
+    breathSound.play().catch(()=>{});
+
+    const gain = 2 + 2*s.up.di;
+    s.oxygen = Math.min(s.maxOxygen,s.oxygen+gain);
+    s.breaths++;
+    s.ap += 2 + s.up.di;
+    update();
+  }
+
+  function tick(){
+    s.oxygen -= .5/(1 + .2*s.up.fi);
+    if(s.oxygen <=0){s.oxygen=10;s.ap=Math.max(0,s.ap-5);}
+    if(s.oxygen < 25){
+      lowOxygenSound.volume = 0.3;
+      if(lowOxygenSound.paused) lowOxygenSound.play().catch(()=>{});
+    } else { lowOxygenSound.pause(); lowOxygenSound.currentTime=0; }
+    if(s.auto>0){ s.ap+=.5*s.auto; s.oxygen=Math.min(s.maxOxygen,s.oxygen+.3*s.auto); }
+    update();
+  }
+
+  setInterval(tick,1000);
+
+  const ox=document.getElementById('oxygen'),
+        ap=document.getElementById('ap'),
+        br=document.getElementById('breaths'),
+        auT=document.getElementById('autos'),
+        oxy=document.getElementById('oxyFill'),
+        apF=document.getElementById('apFill'),
+        upg=document.getElementById('upgrades');
+
+  document.getElementById('breathBtn').onclick=breathe;
+  window.onkeydown = e => { if(e.code==='Space') breathe(); };
+
+  // --- MUTE & VOLUME ---
+  const muteBtn = document.getElementById('muteBtn');
+  const volSlider = document.getElementById('volSlider');
+  let isMuted = false;
+  muteBtn.onclick = () => {
+    isMuted = !isMuted;
+    [ambientSound, breathSound, lowOxygenSound].forEach(a=>a.muted=isMuted);
+    muteBtn.textContent = isMuted ? '🔇 Muted' : '🔈 Mute';
+  };
+  volSlider.oninput = () => {
+    [ambientSound, breathSound, lowOxygenSound].forEach(a=>a.volume=volSlider.value);
+  };
+
+  update();
+</script>
+
+</body>
+</html>
